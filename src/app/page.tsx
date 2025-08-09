@@ -144,19 +144,33 @@ const EXAMPLE_NORMS: Record<Exclude<CategoryKey, "beef_bull_12_18" | "beef_bull_
 function interpolate(table: NormPoint[], w: number): NormPoint {
     if (w <= table[0].w) return table[0];
     if (w >= table[table.length - 1].w) return table[table.length - 1];
-    for (let i = 0; i < table.length - 1; i++) {
-        const a = table[i], b = table[i + 1];
-        if (w >= a.w && w <= b.w) {
-            const t = (w - a.w) / (b.w - a.w);
-            return { w, nel: a.nel + t * (b.nel - a.nel), prot_g: a.prot_g + t * (b.prot_g - a.prot_g) };
-        }
+
+    // binary search for the bounding interval
+    let lo = 0, hi = table.length - 1;
+    while (hi - lo > 1) {
+        const mid = Math.floor((lo + hi) / 2);
+        if (w < table[mid].w) hi = mid;
+        else lo = mid;
     }
-    return table[table.length - 1];
+    const a = table[lo], b = table[hi];
+    const t = (w - a.w) / (b.w - a.w);
+    return { w, nel: a.nel + t * (b.nel - a.nel), prot_g: a.prot_g + t * (b.prot_g - a.prot_g) };
 }
 
 function nearestBullRow(w: number) {
-    return BULLS_TABLE.reduce((best, row) =>
-        Math.abs(row.weight_kg - w) < Math.abs(best.weight_kg - w) ? row : best, BULLS_TABLE[0]);
+    let lo = 0, hi = BULLS_TABLE.length - 1;
+    while (lo <= hi) {
+        const mid = Math.floor((lo + hi) / 2);
+        const midW = BULLS_TABLE[mid].weight_kg;
+        if (midW === w) return BULLS_TABLE[mid];
+        if (midW < w) lo = mid + 1; else hi = mid - 1;
+    }
+    // lo is the first heavier index, hi is the last lighter index
+    if (lo >= BULLS_TABLE.length) return BULLS_TABLE[BULLS_TABLE.length - 1];
+    if (hi < 0) return BULLS_TABLE[0];
+    const lower = BULLS_TABLE[hi];
+    const upper = BULLS_TABLE[lo];
+    return Math.abs(lower.weight_kg - w) <= Math.abs(upper.weight_kg - w) ? lower : upper;
 }
 
 // DM limiti (kg/kun)
@@ -276,9 +290,9 @@ export default function RationGeneratorUZ() {
         selectedFeeds.forEach((f) => groups[f.class].push(f));
 
         const weightByClass: Record<FeedClass, (f: Feed) => number> = {
-            roughage: (f) => f.ts_kg,          // dag'al — TS zichlik
-            energy:   (f) => f.energy_nel_kg,  // energiya — NeL
-            protein:  (f) => f.protein_kg,     // oqsil — CP
+            roughage: (f) => f.ts_kg,                                  // dag'al — TS zichlik
+            energy:   (f) => norms.basis === "ME" ? f.energy_me : f.energy_nel_kg, // energiya — mos birlik
+            protein:  (f) => f.protein_kg,                             // oqsil — CP
         };
 
         const perFeed: Array<{ name: string; cls: FeedClass; kg: number; dm: number; f: Feed }> = [];
@@ -303,7 +317,7 @@ export default function RationGeneratorUZ() {
 
         const dmTotal = Math.round(perFeed.reduce((s, x) => s + x.dm, 0) * 100) / 100;
         return { perClassKg, perFeed: perFeed.sort((a, b) => a.name.localeCompare(b.name)), dmTotal };
-    }, [effectiveTotal, selectedFeeds, classPercents]);
+    }, [effectiveTotal, selectedFeeds, classPercents, norms.basis]);
 
     // --- Hisoblangan ta'minot (supply) va defitsit ---
     const supply = useMemo(() => {
