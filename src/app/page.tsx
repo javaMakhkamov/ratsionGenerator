@@ -438,30 +438,38 @@ export default function RationGeneratorUZ() {
     }, [distribution.perFeed, avg, effectiveTotal, classPercents, coverage, norms, weight, category, selectedFeeds.length]);
 
     // --- Export funksiyalari (html-to-image dinamik import) ---
+    const toDataUrl = async () => {
+        if (!exportRef.current) throw new Error("no-node");
+        const { toPng } = await import("html-to-image");
+        return toPng(exportRef.current, {
+            cacheBust: true,
+            backgroundColor: "#ffffff",
+            pixelRatio: 2,
+        });
+    };
+
     const exportPNG = async () => {
-        if (!exportRef.current) return;
         try {
-            const htmlToImage = await import("html-to-image");
-            const dataUrl: string = await htmlToImage.toPng(exportRef.current, { cacheBust: true, backgroundColor: "#ffffff", pixelRatio: 2 });
-            const a = document.createElement("a");
-            a.href = dataUrl;
-            a.download = `ratsion_${new Date().toISOString().slice(0, 10)}.png`;
-            a.click();
+            const dataUrl = await toDataUrl();
+            const link = document.createElement("a");
+            link.href = dataUrl;
+            link.download = `ratsion_${new Date().toISOString().slice(0, 10)}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         } catch {
             alert("PNG eksport uchun 'html-to-image' paketini o‘rnating: npm i html-to-image");
         }
     };
 
     const exportPDF = async () => {
-        if (!exportRef.current) return;
         try {
-            const htmlToImage = await import("html-to-image");
+            const dataUrl = await toDataUrl();
             const { jsPDF } = await import("jspdf");
-            const dataUrl: string = await htmlToImage.toPng(exportRef.current, { cacheBust: true, backgroundColor: "#ffffff", pixelRatio: 2 });
             const pdf = new jsPDF({ orientation: "p", unit: "pt", format: "a4" });
             const img = new Image();
             img.src = dataUrl;
-            await new Promise((res) => (img.onload = res));
+            await new Promise(res => (img.onload = res));
             const pw = pdf.internal.pageSize.getWidth();
             const ph = pdf.internal.pageSize.getHeight();
             const ratio = Math.min(pw / img.width, ph / img.height);
