@@ -440,12 +440,12 @@ export default function RationGeneratorUZ() {
     // --- Export funksiyalari (html-to-image dinamik import) ---
     const toDataUrl = async () => {
         if (!exportRef.current) throw new Error("no-node");
-        const { toPng } = await import("html-to-image");
-        return toPng(exportRef.current, {
-            cacheBust: true,
+        const html2canvas = (await import("html2canvas")).default;
+        const canvas = await html2canvas(exportRef.current, {
             backgroundColor: "#ffffff",
-            pixelRatio: 2,
+            scale: 2,
         });
+        return canvas.toDataURL("image/png");
     };
 
     const exportPNG = async () => {
@@ -458,7 +458,7 @@ export default function RationGeneratorUZ() {
             link.click();
             document.body.removeChild(link);
         } catch {
-            alert("PNG eksport uchun 'html-to-image' paketini o‘rnating: npm i html-to-image");
+            alert("PNG eksport uchun 'html2canvas' paketini o‘rnating: npm i html2canvas");
         }
     };
 
@@ -480,7 +480,7 @@ export default function RationGeneratorUZ() {
             pdf.addImage(dataUrl, "PNG", x, y, w, h, undefined, "FAST");
             pdf.save(`ratsion_${new Date().toISOString().slice(0, 10)}.pdf`);
         } catch {
-            alert("PDF eksport uchun 'html-to-image' va 'jspdf' paketlarini o‘rnating: npm i html-to-image jspdf");
+            alert("PDF eksport uchun 'html2canvas' va 'jspdf' paketlarini o‘rnating: npm i html2canvas jspdf");
         }
     };
 
